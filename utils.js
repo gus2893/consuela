@@ -1,18 +1,21 @@
-import 'dotenv/config';
+import "dotenv/config";
+import axios from "axios";
 
-export async function DiscordRequest(endpoint, options) {
-  // append endpoint to root API URL
-  const url = 'https://discord.com/api/v10/' + endpoint;
-  // Stringify payloads
+export async function DiscordRequest({
+  endpoint = "",
+  options = {},
+  version = "v10",
+  Authorization = `Bot ${process.env.DISCORD_TOKEN}`,
+}) {
+  const url = `https://discord.com/api/${version}/${endpoint}`;
+
   if (options.body) options.body = JSON.stringify(options.body);
-  // Use fetch to make requests
   const res = await fetch(url, {
     headers: {
-      Authorization: `Bot ${process.env.DISCORD_TOKEN}`,
-      'Content-Type': 'application/json; charset=UTF-8',
-      'User-Agent': 'DiscordBot (https://github.com/discord/discord-example-app, 1.0.0)',
+      Authorization,
+      "Content-Type": "application/json; charset=UTF-8",
     },
-    ...options
+    ...options,
   });
   // throw API errors
   if (!res.ok) {
@@ -25,23 +28,68 @@ export async function DiscordRequest(endpoint, options) {
 }
 
 export async function InstallGlobalCommands(appId, commands) {
-  // API endpoint to overwrite global commands
   const endpoint = `applications/${appId}/commands`;
 
   try {
-    // This is calling the bulk overwrite endpoint: https://discord.com/developers/docs/interactions/application-commands#bulk-overwrite-global-application-commands
-    await DiscordRequest(endpoint, { method: 'PUT', body: commands });
+    await DiscordRequest({
+      endpoint,
+      options: { method: "PUT", body: commands },
+    });
+    console.log("Updated Commands");
   } catch (err) {
     console.error(err);
   }
 }
 
-// Simple method that returns a random emoji from list
-export function getRandomEmoji() {
-  const emojiList = ['😭','😄','😌','🤓','😎','😤','🤖','😶‍🌫️','🌏','📸','💿','👋','🌊','✨'];
-  return emojiList[Math.floor(Math.random() * emojiList.length)];
-}
+const spotifyToken = async () => {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 
-export function capitalize(str) {
-  return str.charAt(0).toUpperCase() + str.slice(1);
-}
+  const requestBody = {
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+  };
+
+  try {
+    const { data } = await axios.post(
+      "https://accounts.spotify.com/api/token",
+      requestBody,
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+
+    return data.access_token;
+  } catch (error) {
+    console.log("ERROR GETTING TOKEN");
+  }
+};
+
+export const getPlaylist = async (playlistId) => {
+  const token = await spotifyToken();
+  if (token) {
+    try {
+      const { data } = await axios.get(
+        `https://api.spotify.com/v1/playlists/${playlistId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      const forattedTracks = data.tracks.items.map(
+        ({ track: { artists, name } }) => {
+          const artistList = artists.map((artist) => artist.name).toString();
+          return `${name} - ${artistList}`;
+        }
+      );
+
+      return forattedTracks;
+    } catch (error) {
+      console.log("ERROR GETTING PLAYLIST");
+    }
+  }
+};
