@@ -68,28 +68,47 @@ const spotifyToken = async () => {
   }
 };
 
+export const getSpotifyInstance = async () => {
+  const token = await spotifyToken();
+  if (token) {
+    return axios.create({
+      baseURL: "https://api.spotify.com/v1",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+};
+
 export const getPlaylist = async (playlistId) => {
+  try {
+    const spotifyInstance = await getSpotifyInstance();
+    const { data } = await spotifyInstance(`/playlists/${playlistId}`);
+
+    const forattedTracks = data.tracks.items.map(
+      ({ track: { artists, name } }) => {
+        const artistList = artists.map((artist) => artist.name).toString();
+        return `${name} - ${artistList}`;
+      }
+    );
+
+    return forattedTracks;
+  } catch (error) {
+    console.log("ERROR GETTING PLAYLIST");
+  }
+};
+
+export const getCurrentTrack = async () => {
   const token = await spotifyToken();
   if (token) {
     try {
-      const { data } = await axios.get(
-        `https://api.spotify.com/v1/playlists/${playlistId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      const forattedTracks = data.tracks.items.map(
-        ({ track: { artists, name } }) => {
-          const artistList = artists.map((artist) => artist.name).toString();
-          return `${name} - ${artistList}`;
-        }
-      );
+      const spotifyInstance = await getSpotifyInstance();
+      const { data } = await spotifyInstance(`/me/player`);
 
-      return forattedTracks;
+      console.log("DATA", data);
+      return data;
     } catch (error) {
-      console.log("ERROR GETTING PLAYLIST");
+      console.log("ERROR GETTING PLAYER", error.response);
     }
   }
 };
